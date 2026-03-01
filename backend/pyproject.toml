@@ -1,0 +1,15 @@
+[project]
+name = "spikesense-agent"
+version = "0.1.0"
+description = "SpikeSense — AI table tennis umpire & commentator using Vision Agents SDK"
+requires-python = ">=3.11"
+dependencies = [
+    "vision-agents[getstream,gemini,ultralytics]>=0.3.8",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.27.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+]
+
+[project.scripts]
+agent = "agent:main"

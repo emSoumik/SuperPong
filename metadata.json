@@ -1,0 +1,8 @@
+{
+  "name": "SpikeSense",
+  "description": "AI-Powered Live Table Tennis Scorer with Voice Commentary",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
