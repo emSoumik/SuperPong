@@ -22,7 +22,7 @@ Ever wonder what an AI umpire looks like? Watch this short demo:
 
 <div align="center">
 
-'<video to added>'
+![Demo-video](https://github.com/user-attachments/assets/c1052c07-ac58-473d-bf04-7c3c50b0567e)
 
 > *Can't see the video above? [Watch the demo on YouTube 📺](https://youtu.be/EGWD7-OZPSo)*
 
