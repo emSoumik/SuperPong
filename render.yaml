@@ -4,16 +4,12 @@ services:
     runtime: python
     plan: free
     rootDir: backend
-    buildCommand: python -m pip install uv && uv venv && uv pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio && uv pip install --no-cache-dir .
+    buildCommand: pip install uv && uv venv && uv pip install fastapi "uvicorn[standard]" python-dotenv httpx opencv-python-headless numpy
     startCommand: .venv/bin/uvicorn agent:create_app --factory --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
-      - key: OMP_NUM_THREADS
-        value: "1"
-      - key: MKL_NUM_THREADS
-        value: "1"
       - key: GOOGLE_API_KEY
         sync: false
       - key: GEMINI_API_KEY
