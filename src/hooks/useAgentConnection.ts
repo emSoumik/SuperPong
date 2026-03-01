@@ -6,7 +6,7 @@ import { logger } from '../lib/logger';
 
 const AGENT_URL = runtimeConfig.agentUrl;
 
-export type ConnectionMode = 'idle' | 'checking' | 'agent' | 'browser-fallback';
+export type ConnectionMode = 'idle' | 'checking' | 'agent' | 'error';
 
 interface AgentConnectionResult {
   mode: ConnectionMode;
@@ -116,10 +116,13 @@ export function useAgentConnection(
       }
     }
 
-    // Use browser-side Gemini Live if the backend is down
-    setMode('browser-fallback');
-    await connectGemini();
-  }, [agentAvailable, createAgentSession, connectGemini]);
+    // Backend fallback is disabled for security (prevents exposing GEMINI_API_KEY in browser)
+    setMode('error');
+    setAgentErrorHint({
+      title: 'Umpire Offline',
+      hint: 'The AI scoring server is currently unavailable. Please ensure the backend is running and connected.',
+    });
+  }, [agentAvailable, createAgentSession]);
 
   // Attempt initial connection on load
   const didAutoConnect = useRef(false);

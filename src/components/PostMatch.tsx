@@ -40,15 +40,16 @@ export function PostMatch({ matchState, onNewMatch, onNextSet }: Props) {
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans">
       <div className="w-full max-w-4xl bg-zinc-900/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/10">
-        <div className="text-center mb-12">
+        <div className="flex flex-col items-center mb-8">
+          <img src="/favicon.ico" alt="SuperPong Logo" className="w-16 h-16 mb-4 rounded-xl shadow-2xl border border-white/10" />
           <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 flex items-center justify-center gap-2">
             <Trophy size={14} className="text-emerald-500" />
             {isMatchFinished ? "Match Final" : `Set ${matchState.current_game} Finished`}
           </h2>
-          <h1 className="text-5xl font-black tracking-tighter text-white">
-            {isMatchFinished ? (isDraw ? "It's a Draw!" : `${winner} Takes the Match!`) : `${matchState.player1_score > matchState.player2_score ? matchState.player1_name : matchState.player2_name} Wins the Set!`}
-          </h1>
         </div>
+        <h1 className="text-5xl font-black tracking-tighter text-white mb-12 text-center">
+          {isMatchFinished ? (isDraw ? "It's a Draw!" : `${winner} Takes the Match!`) : `${matchState.player1_score > matchState.player2_score ? matchState.player1_name : matchState.player2_name} Wins the Set!`}
+        </h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           {/* Player 1 Stats */}
@@ -56,7 +57,7 @@ export function PostMatch({ matchState, onNewMatch, onNextSet }: Props) {
             <h3 className="text-xl font-bold text-blue-400 mb-2">{matchState.player1_name}</h3>
             <div className="text-6xl font-black font-mono mb-4">{matchState.player1_games}</div>
             <div className="text-sm text-zinc-400 uppercase tracking-widest font-bold">Sets Won</div>
-            
+
             <div className="w-full mt-6 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">Total Points</span>
@@ -72,7 +73,7 @@ export function PostMatch({ matchState, onNewMatch, onNextSet }: Props) {
           {/* Center vs */}
           <div className="flex flex-col items-center justify-center">
             <div className="text-4xl text-zinc-700 font-black italic mb-8">VS</div>
-            
+
             <div className="flex flex-col gap-4 w-full">
               <div className="bg-zinc-950/50 rounded-xl p-4 border border-white/5 flex items-center gap-4">
                 <Clock size={20} className="text-emerald-500" />
@@ -96,7 +97,7 @@ export function PostMatch({ matchState, onNewMatch, onNextSet }: Props) {
             <h3 className="text-xl font-bold text-red-400 mb-2">{matchState.player2_name}</h3>
             <div className="text-6xl font-black font-mono mb-4">{matchState.player2_games}</div>
             <div className="text-sm text-zinc-400 uppercase tracking-widest font-bold">Sets Won</div>
-            
+
             <div className="w-full mt-6 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">Total Points</span>
@@ -112,7 +113,7 @@ export function PostMatch({ matchState, onNewMatch, onNextSet }: Props) {
 
         <div className="flex justify-center gap-6">
           {!isMatchFinished && onNextSet && (
-            <button 
+            <button
               onClick={() => { setCountdown(null); onNextSet(); }}
               className="relative bg-blue-500 hover:bg-blue-400 text-zinc-950 font-black text-lg px-12 py-4 rounded-full transition-colors uppercase tracking-widest flex items-center gap-3"
             >
@@ -139,7 +140,7 @@ export function PostMatch({ matchState, onNewMatch, onNextSet }: Props) {
               Start Next Set
             </button>
           )}
-          <button 
+          <button
             onClick={onNewMatch}
             className={`${isMatchFinished ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'} font-black text-lg px-12 py-4 rounded-full transition-colors uppercase tracking-widest flex items-center gap-2`}
           >

@@ -432,8 +432,11 @@ export function LiveHud({ matchState, updateMatch, endMatch }: Props) {
 
       {/* Top Banner */}
       <div className={`absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-6 py-2 ${headerColor} transition-colors duration-500`}>
-        <div className="text-xs font-bold tracking-widest uppercase opacity-80">
-          TABLE TENNIS <span className="mx-2">—</span> SINGLES FINAL
+        <div className="flex items-center gap-3">
+          <img src="/favicon.ico" alt="SuperPong Logo" className="w-6 h-6 rounded-md shadow-lg border border-white/10" />
+          <div className="text-xs font-bold tracking-widest uppercase opacity-80">
+            SUPERPONG <span className="mx-2">—</span> SINGLES FINAL
+          </div>
         </div>
         <div className="font-black tracking-widest text-sm">
           {headerText}
@@ -641,16 +644,12 @@ export function LiveHud({ matchState, updateMatch, endMatch }: Props) {
         <div className="bg-zinc-900/80 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex flex-col items-center gap-3 w-64">
           {/* Connection mode + live status */}
           <div className="flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase w-full justify-center">
-            {mode === 'checking' && <span className="text-yellow-400 animate-pulse">Checking agent…</span>}
+            {mode === 'checking' && <span className="text-yellow-400 animate-pulse">Checking Umpire…</span>}
+            {mode === 'error' && <span className="text-red-400 flex items-center gap-1"><WifiOff size={12} /> Offline</span>}
             {mode === 'agent' && (
               <span className="text-emerald-400 flex items-center gap-1"><Cpu size={12} /> Vision Agent</span>
             )}
-            {mode === 'browser-fallback' && (
-              <span className={`${statusCfg.color} flex items-center gap-1 ${statusCfg.pulse ? 'animate-pulse' : ''}`}>
-                <statusCfg.Icon size={12} />
-                {statusCfg.label}
-              </span>
-            )}
+
             {mode === 'idle' && !isConnected && (
               <span className="text-zinc-500 flex items-center gap-1"><Zap size={12} /> Standby</span>
             )}

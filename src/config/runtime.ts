@@ -2,7 +2,7 @@ const trimTrailingSlash = (value: string) => value.replace(/\/$/, '');
 
 export const runtimeConfig = {
     agentUrl: trimTrailingSlash(import.meta.env.VITE_AGENT_URL || 'http://localhost:8000'),
-    geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY || (globalThis as any).process?.env?.GEMINI_API_KEY || '',
+    geminiApiKey: '', // Removed for security — Browser-side Gemini Live is disabled. Use backend exclusively.
     geminiModel: import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash-native-audio-preview-09-2025',
     audio: {
         inputSampleRate: 16000,

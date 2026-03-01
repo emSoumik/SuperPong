@@ -4,10 +4,16 @@ services:
     runtime: python
     plan: free
     rootDir: backend
-    buildCommand: apt-get update && apt-get install -y ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev && pip install .
+    buildCommand: pip install uv && uv pip install --system --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio && uv pip install --system --no-cache-dir .
     startCommand: uvicorn agent:create_app --factory --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
       - key: GOOGLE_API_KEY
         sync: false
       - key: GEMINI_API_KEY

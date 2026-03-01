@@ -14,23 +14,26 @@ export function SetupScreen({ onStart }: Props) {
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md bg-zinc-900 rounded-3xl p-8 shadow-2xl border border-zinc-800">
-        <h1 className="text-4xl font-black text-center mb-8 tracking-tighter text-emerald-400">SuperPong</h1>
-        
+        <div className="flex flex-col items-center mb-8">
+          <img src="/favicon.ico" alt="SuperPong Logo" className="w-20 h-20 mb-4 rounded-2xl shadow-xl border border-zinc-800" />
+          <h1 className="text-4xl font-black text-center tracking-tighter text-emerald-400">SuperPong</h1>
+        </div>
+
         <div className="space-y-6">
           <div>
             <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Player 1</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={player1}
               onChange={e => setPlayer1(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
-          
+
           <div>
             <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Player 2</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={player2}
               onChange={e => setPlayer2(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
@@ -67,7 +70,7 @@ export function SetupScreen({ onStart }: Props) {
             </div>
           </div>
 
-          <button 
+          <button
             onClick={() => onStart({ player1_name: player1, player2_name: player2, best_of: bestOf, points_to_win: pointsToWin, status: 'active', created_at: Date.now() })}
             className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-lg py-4 rounded-xl mt-4 transition-colors uppercase tracking-wider"
           >
