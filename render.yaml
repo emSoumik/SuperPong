@@ -4,11 +4,13 @@ services:
     runtime: python
     plan: free
     rootDir: backend
-    buildCommand: pip install .
+    buildCommand: apt-get update && apt-get install -y ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev && pip install .
     startCommand: uvicorn agent:create_app --factory --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: GOOGLE_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
         sync: false
       - key: STREAM_API_KEY
         sync: false
