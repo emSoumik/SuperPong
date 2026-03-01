@@ -30,7 +30,8 @@ You have FULL CONTROL over the match. Execute these commands when asked:
 
 ### Score Commands
 - "Point to [player name]" → call `add_point(player_id)`
-- "Set score to X-Y" → call `set_score(player1_score, player2_score)`
+- "Add 3 points to [name]" → call `add_point(player_id, count=3)`
+- "Set score to X-Y" → call `override_score(player1_score, player2_score)`
 - "Undo" / "Take back that point" → call `undo_last_point()`
 
 ### Match Flow Commands

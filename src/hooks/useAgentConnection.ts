@@ -1,44 +1,26 @@
-/**
- * useAgentConnection — Tries Vision Agents backend first, falls back to browser Gemini Live.
- *
- * 1. On mount, pings `AGENT_URL/health` to check if the backend is available.
- * 2. If `agent_available === true`, creates a session and lets the backend handle
- *    voice + vision via Vision Agents SDK (WebRTC transport + Gemini Realtime).
- * 3. If the backend is unavailable or the session fails, transparently falls back
- *    to the existing browser-side `useGeminiLive` hook which connects directly to
- *    Google's Gemini Live API from the browser.
- *
- * The returned API surface is identical regardless of which mode is active, so the
- * UI doesn't need to know which path is running.
- */
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MatchState } from '../store/matchState';
-import { useGeminiLive } from './useGeminiLive';
+import { useGeminiLive, GeminiStatus, ErrorHint } from './useGeminiLive';
+import { runtimeConfig } from '../config/runtime';
+import { logger } from '../lib/logger';
 
-const AGENT_URL = (typeof process !== 'undefined' && process.env?.VITE_AGENT_URL)
-  || 'http://localhost:8000';
+const AGENT_URL = runtimeConfig.agentUrl;
 
-type ConnectionMode = 'idle' | 'checking' | 'agent' | 'browser-fallback';
+export type ConnectionMode = 'idle' | 'checking' | 'agent' | 'browser-fallback';
 
 interface AgentConnectionResult {
-  /** Which mode is active */
   mode: ConnectionMode;
-  /** Whether voice is connected (via either path) */
   isConnected: boolean;
-  /** Whether the mic is live */
   isListening: boolean;
-  /** Last text message from the AI */
   lastMessage: string;
-  /** Connect voice */
+  /** Live status of the Gemini connection pipeline */
+  geminiStatus: GeminiStatus;
+  /** Suggested fix for any connection or backend errors */
+  errorHint: ErrorHint | null;
   connect: () => Promise<void>;
-  /** Disconnect voice */
   disconnect: () => void;
-  /** Toggle mic on/off */
   toggleListening: () => void;
-  /** Send a text message to the AI */
   sendTextMessage: (text: string) => void;
-  /** Send a silent state update to the backend (no-op in browser mode) */
   sendStateUpdate: (state: MatchState) => void;
 }
 
@@ -48,48 +30,30 @@ export function useAgentConnection(
 ): AgentConnectionResult {
   const [mode, setMode] = useState<ConnectionMode>('idle');
   const [agentAvailable, setAgentAvailable] = useState<boolean | null>(null);
+  const [agentErrorHint, setAgentErrorHint] = useState<ErrorHint | null>(null);
   const matchIdRef = useRef<string | null>(null);
 
-  // Always call the Gemini Live hook — it's a React hook and must be called unconditionally.
-  // We just won't use its `connect` unless we're in fallback mode.
-  const geminiLive = useGeminiLive(matchState, onFunctionCall);
+  const {
+    isConnected: isGeminiConnected,
+    isListening: isGeminiListening,
+    lastMessage,
+    status: geminiStatus,
+    errorHint: geminiErrorHint,
+    connect: connectGemini,
+    disconnect: disconnectGemini,
+    toggleListening,
+    sendTextMessage: sendTextToGemini,
+    sendStateUpdate: sendStateToGemini,
+  } = useGeminiLive(matchState, onFunctionCall);
 
-  // ------- Check backend health on mount -------
-  useEffect(() => {
-    let cancelled = false;
-    setMode('checking');
-
-    (async () => {
-      try {
-        const res = await fetch(`${AGENT_URL}/health`, { signal: AbortSignal.timeout(3000) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (cancelled) return;
-
-        if (data.agent_available) {
-          setAgentAvailable(true);
-          setMode('agent');
-        } else {
-          setAgentAvailable(false);
-          setMode('browser-fallback');
-        }
-      } catch {
-        if (cancelled) return;
-        setAgentAvailable(false);
-        setMode('browser-fallback');
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, []);
-
-  // ------- Agent session management -------
+  // Create a new recording/analysis session with the backend agent
 
   const createAgentSession = useCallback(async () => {
     try {
       const res = await fetch(`${AGENT_URL}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(3000),
         body: JSON.stringify({
           match_id: `match-${Date.now()}`,
           player1_name: matchState.player1_name,
@@ -106,60 +70,95 @@ export function useAgentConnection(
         return true;
       }
 
-      // Agent session couldn't start — fall back
-      console.warn('Agent session created but agent not connected — falling back to browser Gemini');
+      logger.info('Agent session created but agent not connected → browser fallback', {
+        hook: 'useAgentConnection',
+      });
       return false;
     } catch (err) {
-      console.warn('Failed to create agent session:', err);
       return false;
     }
   }, [matchState.player1_name, matchState.player2_name, matchState.best_of, matchState.serving]);
 
-  // ------- Unified API methods -------
+  // Primary connection logic: checks backend first, falls back to direct Gemini Live if needed
 
   const connect = useCallback(async () => {
-    if (mode === 'agent' || agentAvailable) {
+    setMode('checking');
+    setAgentErrorHint(null);
+    let isAgentAvailable = agentAvailable;
+
+    // Verify backend is reachable
+    if (isAgentAvailable !== true) {
+      try {
+        logger.info('Checking backend health...', { url: `${AGENT_URL}/health`, hook: 'useAgentConnection' });
+        const res = await fetch(`${AGENT_URL}/health`, {
+          signal: AbortSignal.timeout(3000),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        isAgentAvailable = !!data.agent_available;
+        setAgentAvailable(isAgentAvailable);
+        if (isAgentAvailable) {
+          setAgentErrorHint(null);
+        }
+      } catch {
+        isAgentAvailable = false;
+        setAgentAvailable(false);
+        logger.info('Backend not reachable — using browser Gemini Live', { hook: 'useAgentConnection' });
+      }
+    }
+
+    // Start an agent session if the backend is up
+    if (isAgentAvailable) {
       const ok = await createAgentSession();
       if (ok) {
         setMode('agent');
-        // Agent mode uses WebRTC for voice — the backend handles everything.
-        // We still connect the browser Gemini Live as a transparent companion
-        // so the user has voice feedback while we confirm the agent is streaming.
-        // If the agent is fully handling voice, we can skip this.
         return;
       }
-      // Fall through to browser Gemini
-      setMode('browser-fallback');
     }
 
-    // Browser fallback
+    // Use browser-side Gemini Live if the backend is down
     setMode('browser-fallback');
-    await geminiLive.connect();
-  }, [mode, agentAvailable, createAgentSession, geminiLive]);
+    await connectGemini();
+  }, [agentAvailable, createAgentSession, connectGemini]);
+
+  // Attempt initial connection on load
+  const didAutoConnect = useRef(false);
+  useEffect(() => {
+    if (!didAutoConnect.current) {
+      didAutoConnect.current = true;
+      connect().catch(err => {
+        logger.error('Auto-connect failed', { hook: 'useAgentConnection', error: String(err) });
+      });
+    }
+  }, [connect]);
+
+  // Cleanup connections and sessions
 
   const disconnect = useCallback(() => {
     if (mode === 'agent' && matchIdRef.current) {
-      fetch(`${AGENT_URL}/sessions/${matchIdRef.current}`, { method: 'DELETE' }).catch(() => {});
+      fetch(`${AGENT_URL}/sessions/${matchIdRef.current}`, { method: 'DELETE' }).catch(() => { });
       matchIdRef.current = null;
     }
-    geminiLive.disconnect();
+    disconnectGemini();
     setMode('idle');
-  }, [mode, geminiLive]);
+  }, [mode, disconnectGemini]);
+
+  // Send text to both agent (for training/logs) and direct Gemini
 
   const sendTextMessage = useCallback((text: string) => {
     if (mode === 'agent' && matchIdRef.current) {
-      // Send text to backend agent via REST (it forwards to Gemini)
       fetch(`${AGENT_URL}/matches/${matchIdRef.current}/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command: 'send_text', text }),
-      }).catch(() => {});
+      }).catch(() => { });
     }
-    // Also send via browser Gemini if connected
-    if (geminiLive.isConnected) {
-      geminiLive.sendTextMessage(text);
+    if (isGeminiConnected) {
+      sendTextToGemini(text);
     }
-  }, [mode, geminiLive]);
+  }, [mode, isGeminiConnected, sendTextToGemini]);
+
+  // Broadcast local match state (scores, server, etc.) to the AI
 
   const sendStateUpdate = useCallback((state: MatchState) => {
     if (mode === 'agent' && matchIdRef.current) {
@@ -175,14 +174,19 @@ export function useAgentConnection(
           serving: state.serving,
           status: state.status,
         }),
-      }).catch(() => {});
+      }).catch(() => { });
     }
-    // In browser fallback mode, state is already in the Gemini system prompt
-    // and gets sent via sendTextMessage when rallies end. No extra action needed.
-  }, [mode]);
+    sendStateToGemini(state);
+  }, [mode, sendStateToGemini]);
 
-  // ------- Auto-send state updates when score changes -------
-  const prevScoreRef = useRef({ s1: matchState.player1_score, s2: matchState.player2_score, st: matchState.status });
+  // Sync state whenever the score or match status changes
+
+  const prevScoreRef = useRef({
+    s1: matchState.player1_score,
+    s2: matchState.player2_score,
+    st: matchState.status,
+  });
+
   useEffect(() => {
     const prev = prevScoreRef.current;
     if (
@@ -191,20 +195,24 @@ export function useAgentConnection(
       prev.st !== matchState.status
     ) {
       sendStateUpdate(matchState);
-      prevScoreRef.current = { s1: matchState.player1_score, s2: matchState.player2_score, st: matchState.status };
+      prevScoreRef.current = {
+        s1: matchState.player1_score,
+        s2: matchState.player2_score,
+        st: matchState.status,
+      };
     }
   }, [matchState.player1_score, matchState.player2_score, matchState.status, sendStateUpdate, matchState]);
 
-  // ------- Return unified API -------
   return {
     mode,
-    // In agent mode, voice is handled by the backend — we report connected if session exists
-    isConnected: mode === 'agent' ? matchIdRef.current !== null : geminiLive.isConnected,
-    isListening: mode === 'agent' ? matchIdRef.current !== null : geminiLive.isListening,
-    lastMessage: geminiLive.lastMessage,
+    isConnected: mode === 'agent' ? matchIdRef.current !== null : isGeminiConnected,
+    isListening: mode === 'agent' ? matchIdRef.current !== null : isGeminiListening,
+    lastMessage,
+    geminiStatus,
+    errorHint: agentErrorHint || geminiErrorHint,
     connect,
     disconnect,
-    toggleListening: geminiLive.toggleListening,
+    toggleListening,
     sendTextMessage,
     sendStateUpdate,
   };

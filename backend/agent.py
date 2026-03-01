@@ -36,9 +36,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("spikesense.agent")
 
-# ---------------------------------------------------------------------------
-# Detect whether Vision Agents SDK is available
-# ---------------------------------------------------------------------------
+# Check for Vision Agents SDK availability
 
 HAS_VISION_SDK = False
 try:
@@ -64,9 +62,7 @@ except ImportError:
 
 from processors.ball_tracker import BallTrackingProcessor
 
-# ---------------------------------------------------------------------------
-# In-memory match state (authoritative copy on the server)
-# ---------------------------------------------------------------------------
+# Authorization-authoritative in-memory match state
 
 UMPIRE_INSTRUCTIONS_PATH = pathlib.Path(__file__).parent / "umpire_instructions.md"
 
@@ -98,9 +94,7 @@ def _get_state(match_id: str) -> dict[str, Any]:
     return match_states[match_id]
 
 
-# ---------------------------------------------------------------------------
-# State-push — inject silent context updates into the agent
-# ---------------------------------------------------------------------------
+# State synchronization with the agent
 
 
 async def _push_state_to_agent(match_id: str) -> None:
@@ -134,9 +128,7 @@ async def _push_state_to_agent(match_id: str) -> None:
         logger.debug("State push failed: %s", exc)
 
 
-# ---------------------------------------------------------------------------
-# Create agent — registers all function-calling tools
-# ---------------------------------------------------------------------------
+# Agent lifecycle and tool registration
 
 
 async def create_agent(call_id: str | None = None, **kwargs: Any) -> Agent | None:
@@ -160,26 +152,27 @@ async def create_agent(call_id: str | None = None, **kwargs: Any) -> Agent | Non
 
     llm = gemini.Realtime(fps=5, model="gemini-2.5-flash")
 
-    # --- Ball tracker with event forwarding ---
+    # Ball tracking with event triggers
     ball_tracker = BallTrackingProcessor(
         event_callback=lambda evt: _on_tracker_event(match_id, evt),
     )
 
-    # --- Register function calling tools ---
+    # Tool definitions for the AI to act on the game
 
-    @llm.register_function(description="Award a point to a player. player_id is 'player1' or 'player2'.")
-    async def add_point(player_id: str) -> str:
+    @llm.register_function(description="Award point(s) to a player. player_id is 'player1' or 'player2'. count is the number of points to add, defaults to 1.")
+    async def add_point(player_id: str, count: int = 1) -> str:
         s = _get_state(match_id)
         key = f"{player_id}_score"
         if key not in s:
             return json.dumps({"error": f"Unknown player: {player_id}"})
-        s[key] += 1
+        s[key] += count
         _check_game_win(s, player_id)
         asyncio.create_task(_push_state_to_agent(match_id))
         return json.dumps({
             "player": s.get(f"{player_id}_name", player_id),
             "score": f"{s['player1_score']}-{s['player2_score']}",
             "games": f"{s['player1_games']}-{s['player2_games']}",
+            "action": f"added {count} point(s)"
         })
 
     @llm.register_function(description="Undo the last point scored.")
@@ -254,9 +247,7 @@ async def create_agent(call_id: str | None = None, **kwargs: Any) -> Agent | Non
     return agent
 
 
-# ---------------------------------------------------------------------------
-# Tracker event callback — sends vision events into agent context
-# ---------------------------------------------------------------------------
+# Handles vision-based events from the tracker
 
 
 async def _on_tracker_event(match_id: str, event: dict[str, Any]) -> None:
@@ -286,9 +277,7 @@ async def _on_tracker_event(match_id: str, event: dict[str, Any]) -> None:
             pass
 
 
-# ---------------------------------------------------------------------------
-# Game/set logic
-# ---------------------------------------------------------------------------
+# Score and match logic
 
 
 def _check_game_win(state: dict[str, Any], scorer: str) -> None:
@@ -335,9 +324,7 @@ def _add_event(state: dict[str, Any], etype: str, player_id: str | None = None) 
     })
 
 
-# ---------------------------------------------------------------------------
-# FastAPI app — REST + WebSocket
-# ---------------------------------------------------------------------------
+# API endpoints for session and state management
 
 
 def create_app() -> FastAPI:
@@ -350,7 +337,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # --- Health / capability check ---
+    # Health and capability check for the frontend
     @app.get("/health")
     async def health():
         return {
@@ -360,7 +347,7 @@ def create_app() -> FastAPI:
             "active_matches": list(match_states.keys()),
         }
 
-    # --- Session management ---
+    # Session management
     @app.post("/sessions")
     async def create_session(body: dict[str, Any] = {}):
         match_id = body.get("match_id", f"match-{int(time.time())}")
@@ -402,7 +389,7 @@ def create_app() -> FastAPI:
         _last_state_hash.pop(match_id, None)
         return {"deleted": True}
 
-    # --- Match state ---
+    # Match state access
     @app.get("/matches/{match_id}")
     async def get_match(match_id: str):
         return _get_state(match_id)
@@ -443,7 +430,7 @@ def create_app() -> FastAPI:
         asyncio.create_task(_push_state_to_agent(match_id))
         return state
 
-    # --- State notification (frontend → backend) ---
+    # Manual state overrides from frontend
     @app.post("/matches/{match_id}/state-notify")
     async def state_notify(match_id: str, body: dict[str, Any] = {}):
         """Frontend notifies backend of manual state changes."""
@@ -458,9 +445,7 @@ def create_app() -> FastAPI:
     return app
 
 
-# ---------------------------------------------------------------------------
-# Main entry-point
-# ---------------------------------------------------------------------------
+# Server entry point
 
 
 def main():
