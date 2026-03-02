@@ -33,5 +33,5 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Expose the internal port (purely for documentation)
 EXPOSE 8080
 
-# Use shell form to allow environment variable expansion (for Render's dynamic $PORT)
+# Use shell form to allow environment variable expansion (Railway injects $PORT dynamically)
 CMD ["sh", "-c", "uvicorn agent:create_app --factory --host 0.0.0.0 --port ${PORT:-8080}"]

@@ -2,10 +2,9 @@ const trimTrailingSlash = (value: string) => value.replace(/\/$/,  '');
 
 export const runtimeConfig = {
   // VITE_AGENT_URL should be set in your deployment environment.
-  // Production: https://superpong-backend.onrender.com
-  // Dev preview: https://superpong-backend-rwdf.onrender.com
+  // Production: https://superpong-backend-production.up.railway.app
   // Local:       http://localhost:8080
-  agentUrl: trimTrailingSlash(import.meta.env.VITE_AGENT_URL || 'https://superpong-backend.onrender.com'),
+  agentUrl: trimTrailingSlash(import.meta.env.VITE_AGENT_URL || 'https://superpong-backend-production.up.railway.app'),
   geminiApiKey: '', // Removed for security — Browser-side Gemini Live is disabled. Use backend exclusively.
   geminiModel: import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash-native-audio-preview-09-2025',
   audio: {
