@@ -3,7 +3,7 @@ services:
     name: superpong-backend
     runtime: docker
     dockerContext: ./backend
-    dockerfilePath: Dockerfile
+    dockerfilePath: ./backend/Dockerfile
     plan: free
     healthCheckPath: /health
     envVars:
