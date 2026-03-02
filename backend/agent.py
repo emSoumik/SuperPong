@@ -27,6 +27,7 @@ import os
 import pathlib
 import sys
 import time
+import traceback
 from typing import Any
 
 from dotenv import load_dotenv
@@ -45,11 +46,15 @@ try:
 
     HAS_VISION_SDK = True
     logger.info("✓ Vision Agents SDK detected — full agent mode")
-except ImportError:
+except ImportError as e:
     logger.warning(
-        "✗ Vision Agents SDK not installed — running in fallback/REST-only mode. "
-        "Frontend will use browser-side Gemini Live."
+        "✗ Vision Agents SDK not installed or missing dependencies — running in fallback/REST-only mode. "
+        "Error: %s", e
     )
+    logger.debug("Import traceback:\n%s", traceback.format_exc())
+except Exception as e:
+    logger.error("Unexpected error during Vision Agents SDK import: %s", e)
+    logger.debug(traceback.format_exc())
 
 # Always import FastAPI for REST
 try:

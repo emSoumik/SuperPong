@@ -15,7 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 full = [
-    "vision-agents[gemini]>=0.3.8",
+    "vision-agents[gemini,getstream,ultralytics]>=0.1.18",
 ]
 
 [project.scripts]
