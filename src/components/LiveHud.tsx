@@ -21,6 +21,61 @@ const STATUS_MAP: Record<GeminiStatus, { label: string; color: string; Icon: Rea
   error: { label: 'Error', color: 'text-red-400', Icon: AlertCircle, pulse: false },
 };
 
+const HINTS = {
+  countdown: [
+    "Say 'Start match' to skip the clock",
+    "Welcome the players to the court!",
+    "Ask SuperPong for a quick pep talk",
+    "Say 'What are the rules?'"
+  ],
+  active: [
+    "Say 'Point for player 1' after a rally",
+    "Try 'Pause match' if you need a break",
+    "Ask 'What is the current score?'",
+    "Say 'Set camera to center' for a better view"
+  ],
+  paused: [
+    "Say 'Resume match' to keep playing",
+    "Try 'Reset the score' to start over",
+    "Ask 'Who is currently winning?'",
+    "Say 'End match' if you're finished"
+  ],
+  ended: [
+    "Say 'Start new match' to play again",
+    "Ask 'Who won the match?'",
+    "Congratulate the winner!",
+    "Say 'Rematch' to reset everything"
+  ]
+};
+
+function HintCarousel({ hints }: { hints: string[] }) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % hints.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [hints.length]);
+
+  return (
+    <div className="h-4 overflow-hidden flex items-center justify-center">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={hints[index]}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.5 }}
+          className="text-[10px] font-medium tracking-wider text-zinc-400 uppercase italic whitespace-nowrap"
+        >
+          {hints[index]}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function LiveHud({ matchState, updateMatch, endMatch }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -438,8 +493,13 @@ export function LiveHud({ matchState, updateMatch, endMatch }: Props) {
             SUPERPONG <span className="mx-2">—</span> SINGLES FINAL
           </div>
         </div>
-        <div className="font-black tracking-widest text-sm">
-          {headerText}
+        <div className="flex flex-col items-center">
+          <div className="font-black tracking-widest text-sm uppercase">
+            {headerText}
+          </div>
+          <div className="mt-0.5 min-w-[200px]">
+            <HintCarousel hints={countdown !== null ? HINTS.countdown : (HINTS[matchState.status] || HINTS.active)} />
+          </div>
         </div>
         <div className="flex items-center gap-4 text-xs font-bold tracking-widest">
           <div className="flex items-center gap-2">
@@ -500,6 +560,9 @@ export function LiveHud({ matchState, updateMatch, endMatch }: Props) {
             <h2 className="text-3xl font-bold tracking-widest text-emerald-400 uppercase">Match Starts In</h2>
             <div className="text-9xl font-black font-mono tracking-tighter text-white animate-pulse">
               {countdown}
+            </div>
+            <div className="mt-4 bg-white/5 backdrop-blur-md px-6 py-2 rounded-full border border-white/10">
+              <HintCarousel hints={HINTS.countdown} />
             </div>
             <button
               onClick={() => setCountdown(null)}
