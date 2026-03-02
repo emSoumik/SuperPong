@@ -1,15 +1,32 @@
+# Node and frontend build outputs
 node_modules/
 build/
 dist/
 coverage/
+
+# Python virtual environments and caches
+.venv/
+backend/.venv/
+__pycache__/
+backend/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS/editor files
 .DS_Store
+.idea/
+.vscode/
 *.log
+
+# Environment files (except templates)
 .env*
-!.env.example
+backend/.env
+!*.env.example
+
+# Local deployment helpers and docs not needed in git
 scripts/sync-render-env.sh
 scripts/sync-vercel-env.sh
 .github/workflows/sync-env.yml
 DEPLOYMENT.md
-.venv/
-__pycache__/
-*.pyc

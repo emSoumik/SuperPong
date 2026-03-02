@@ -1,0 +1,21 @@
+# Docker ignore for Render backend context (./backend)
+
+# Git and local metadata
+.git/
+.DS_Store
+*.log
+
+# Local env and caches
+.env
+.env.*
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local tooling and docs not required in the runtime image
+docs/
+tests/
+*.md

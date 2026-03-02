@@ -1,33 +1,40 @@
-# Optimized Dockerignore for SuperPong Backend
+# Docker ignore for root-context local builds
 
-# Local environments & temporary files
-.env
-.venv/
-__pycache__/
-*.pyc
+# Git and local metadata
 .git/
 .DS_Store
+*.log
 
-# Frontend source (not needed for backend build)
+# Local env and caches
+.env
+.env.*
+.venv/
+backend/.venv/
+__pycache__/
+backend/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Frontend files (not needed for backend-only image)
 src/
 public/
 node_modules/
 dist/
+build/
+coverage/
 package.json
 package-lock.json
 tsconfig.json
 vite.config.ts
 index.html
 
-# Documentation
+# Docs and local agent metadata
 README.md
 DEPLOYMENT.md
 Skill.md
 docs/
-
-# Render/Vercel artifacts
-render.yaml
-vercel.json
 .gemini/
 .agents/
 .agent/
