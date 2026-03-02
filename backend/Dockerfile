@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir uv
 # Copy lock + project metadata first for better Docker layer caching
 COPY pyproject.toml uv.lock ./
 
-# Install the exact locked runtime set (including Vision Agents extras)
+# Install the runtime set (including Vision Agents extras)
 RUN uv sync --no-dev --extra full
 
 # Copy backend source
