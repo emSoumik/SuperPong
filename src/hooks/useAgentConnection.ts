@@ -6,7 +6,7 @@ import { logger } from '../lib/logger';
 
 const AGENT_URL = runtimeConfig.agentUrl;
 
-export type ConnectionMode = 'idle' | 'checking' | 'agent' | 'error';
+export type ConnectionMode = 'idle' | 'checking' | 'agent' | 'gemini' | 'error';
 
 interface AgentConnectionResult {
   mode: ConnectionMode;
@@ -47,13 +47,12 @@ export function useAgentConnection(
   } = useGeminiLive(matchState, onFunctionCall);
 
   // Create a new recording/analysis session with the backend agent
-
   const createAgentSession = useCallback(async () => {
     try {
       const res = await fetch(`${AGENT_URL}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(5000),
         body: JSON.stringify({
           match_id: `match-${Date.now()}`,
           player1_name: matchState.player1_name,
@@ -64,13 +63,11 @@ export function useAgentConnection(
       });
       if (!res.ok) throw new Error(`Session create failed: ${res.status}`);
       const data = await res.json();
-
       if (data.agent_connected) {
         matchIdRef.current = data.match_id;
         return true;
       }
-
-      logger.info('Agent session created but agent not connected → browser fallback', {
+      logger.info('Agent session created but vision agent not connected → browser Gemini fallback', {
         hook: 'useAgentConnection',
       });
       return false;
@@ -79,11 +76,17 @@ export function useAgentConnection(
     }
   }, [matchState.player1_name, matchState.player2_name, matchState.best_of, matchState.serving]);
 
-  // Primary connection logic: checks backend first, falls back to direct Gemini Live if needed
-
+  /**
+   * Primary connection logic:
+   * 1. Check if backend is reachable.
+   * 2. If backend has vision agent → use agent mode.
+   * 3. Otherwise (backend fallback OR backend unreachable) → always fall through
+   *    to browser-side Gemini Live so the AI still works.
+   */
   const connect = useCallback(async () => {
     setMode('checking');
     setAgentErrorHint(null);
+
     let isAgentAvailable = agentAvailable;
 
     // Verify backend is reachable
@@ -91,23 +94,26 @@ export function useAgentConnection(
       try {
         logger.info('Checking backend health...', { url: `${AGENT_URL}/health`, hook: 'useAgentConnection' });
         const res = await fetch(`${AGENT_URL}/health`, {
-          signal: AbortSignal.timeout(3000),
+          signal: AbortSignal.timeout(5000),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         isAgentAvailable = !!data.agent_available;
         setAgentAvailable(isAgentAvailable);
-        if (isAgentAvailable) {
-          setAgentErrorHint(null);
-        }
-      } catch {
+        logger.info(`Backend reachable. agent_available=${isAgentAvailable}. fallback=${data.fallback}`, {
+          hook: 'useAgentConnection',
+        });
+      } catch (err) {
         isAgentAvailable = false;
         setAgentAvailable(false);
-        logger.info('Backend not reachable — using browser Gemini Live', { hook: 'useAgentConnection' });
+        logger.info('Backend not reachable — falling back to browser Gemini Live', {
+          hook: 'useAgentConnection',
+          error: String(err),
+        });
       }
     }
 
-    // Start an agent session if the backend is up
+    // If backend vision agent is available, try to start an agent session
     if (isAgentAvailable) {
       const ok = await createAgentSession();
       if (ok) {
@@ -116,13 +122,27 @@ export function useAgentConnection(
       }
     }
 
-    // Backend fallback is disabled for security (prevents exposing GEMINI_API_KEY in browser)
-    setMode('error');
-    setAgentErrorHint({
-      title: 'Umpire Offline',
-      hint: 'The AI scoring server is currently unavailable. Please ensure the backend is running and connected.',
-    });
-  }, [agentAvailable, createAgentSession]);
+    // --- ALWAYS FALL BACK TO BROWSER GEMINI LIVE ---
+    // This covers:
+    //  - Backend is up but Vision SDK not installed (agent_available: false)
+    //  - Backend is unreachable
+    //  - Agent session creation failed
+    logger.info('Starting browser-side Gemini Live (fallback)', { hook: 'useAgentConnection' });
+    setMode('gemini');
+    try {
+      await connectGemini();
+    } catch (err) {
+      logger.error('Browser Gemini Live connect failed', {
+        hook: 'useAgentConnection',
+        error: String(err),
+      });
+      setMode('error');
+      setAgentErrorHint({
+        title: 'AI Unavailable',
+        hint: 'Could not connect to Gemini. Check that VITE_GEMINI_API_KEY is set in Vercel environment variables.',
+      });
+    }
+  }, [agentAvailable, createAgentSession, connectGemini]);
 
   // Attempt initial connection on load
   const didAutoConnect = useRef(false);
@@ -136,10 +156,9 @@ export function useAgentConnection(
   }, [connect]);
 
   // Cleanup connections and sessions
-
   const disconnect = useCallback(() => {
-    if (mode === 'agent' && matchIdRef.current) {
-      fetch(`${AGENT_URL}/sessions/${matchIdRef.current}`, { method: 'DELETE' }).catch(() => { });
+    if ((mode === 'agent') && matchIdRef.current) {
+      fetch(`${AGENT_URL}/sessions/${matchIdRef.current}`, { method: 'DELETE' }).catch(() => {});
       matchIdRef.current = null;
     }
     disconnectGemini();
@@ -147,14 +166,13 @@ export function useAgentConnection(
   }, [mode, disconnectGemini]);
 
   // Send text to both agent (for training/logs) and direct Gemini
-
   const sendTextMessage = useCallback((text: string) => {
     if (mode === 'agent' && matchIdRef.current) {
       fetch(`${AGENT_URL}/matches/${matchIdRef.current}/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command: 'send_text', text }),
-      }).catch(() => { });
+      }).catch(() => {});
     }
     if (isGeminiConnected) {
       sendTextToGemini(text);
@@ -162,7 +180,6 @@ export function useAgentConnection(
   }, [mode, isGeminiConnected, sendTextToGemini]);
 
   // Broadcast local match state (scores, server, etc.) to the AI
-
   const sendStateUpdate = useCallback((state: MatchState) => {
     if (mode === 'agent' && matchIdRef.current) {
       fetch(`${AGENT_URL}/matches/${matchIdRef.current}/state-notify`, {
@@ -177,19 +194,17 @@ export function useAgentConnection(
           serving: state.serving,
           status: state.status,
         }),
-      }).catch(() => { });
+      }).catch(() => {});
     }
     sendStateToGemini(state);
   }, [mode, sendStateToGemini]);
 
   // Sync state whenever the score or match status changes
-
   const prevScoreRef = useRef({
     s1: matchState.player1_score,
     s2: matchState.player2_score,
     st: matchState.status,
   });
-
   useEffect(() => {
     const prev = prevScoreRef.current;
     if (
@@ -206,10 +221,20 @@ export function useAgentConnection(
     }
   }, [matchState.player1_score, matchState.player2_score, matchState.status, sendStateUpdate, matchState]);
 
+  const isConnected =
+    mode === 'agent'
+      ? matchIdRef.current !== null
+      : isGeminiConnected;
+
+  const isListening =
+    mode === 'agent'
+      ? matchIdRef.current !== null
+      : isGeminiListening;
+
   return {
     mode,
-    isConnected: mode === 'agent' ? matchIdRef.current !== null : isGeminiConnected,
-    isListening: mode === 'agent' ? matchIdRef.current !== null : isGeminiListening,
+    isConnected,
+    isListening,
     lastMessage,
     geminiStatus,
     errorHint: agentErrorHint || geminiErrorHint,
