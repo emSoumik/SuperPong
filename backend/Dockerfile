@@ -23,5 +23,9 @@ RUN uv pip install --system --no-cache-dir .
 # Copy the rest of the app
 COPY . .
 
-# Run the app
-CMD ["uvicorn", "agent:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# Expose the internal port (purely for documentation)
+EXPOSE 8080
+
+# Use shell form to allow environment variable expansion (for Render's dynamic $PORT)
+CMD uvicorn agent:create_app --factory --host 0.0.0.0 --port ${PORT:-8080}
+

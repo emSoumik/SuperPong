@@ -6,3 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
+scripts/sync-render-env.sh
+scripts/sync-vercel-env.sh
+.github/workflows/sync-env.yml
+DEPLOYMENT.md
+.venv/
+__pycache__/
+*.pyc
