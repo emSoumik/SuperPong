@@ -1,7 +1,10 @@
-FROM python:3.12-slim
+FROM python:3.12
 
-# Install system dependencies (ffmpeg, OpenCV, build tools)
-RUN apt-get update && apt-get install -y \
+# Avoid interactive prompts during APT install
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies (ffmpeg, build tools, etc.)
+RUN apt-get update --fix-missing && apt-get install -y \
     ffmpeg \
     libavformat-dev libavcodec-dev libavdevice-dev \
     libavutil-dev libavfilter-dev libswscale-dev libswresample-dev \
@@ -11,24 +14,20 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy only dependency files first (for layer caching)
-# Note: build context is repo root, Dockerfile is at backend/Dockerfile
-COPY backend/pyproject.toml .
+# Install uv for fast dependency management
+RUN pip install --no-cache-dir uv
 
-# Install Python dependencies into system Python
-RUN pip install --no-cache-dir \
-    fastapi \
-    "uvicorn[standard]" \
-    python-dotenv \
-    httpx \
-    opencv-python-headless \
-    numpy
+# Copy only dependency files first for caching
+COPY pyproject.toml .
+# Install dependencies into system python (cleaner for Docker)
+RUN uv pip install --system --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio
+RUN uv pip install --system --no-cache-dir .
 
-# Copy backend source code
-COPY backend/ .
+# Copy the rest of the app
+COPY . .
 
-# Expose port (documentation only)
+# Expose the internal port (purely for documentation)
 EXPOSE 8080
 
-# Start the server using Render's dynamic $PORT
+# Use shell form to allow environment variable expansion (for Render's dynamic $PORT)
 CMD uvicorn agent:create_app --factory --host 0.0.0.0 --port ${PORT:-8080}
