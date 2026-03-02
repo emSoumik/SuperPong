@@ -6,14 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV UV_LINK_MODE=copy
 
-# Install system dependencies (ffmpeg, build tools, etc.)
-RUN apt-get update --fix-missing && apt-get install -y \
+# Install system dependencies (ffmpeg, etc.)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    libavformat-dev libavcodec-dev libavdevice-dev \
-    libavutil-dev libavfilter-dev libswscale-dev libswresample-dev \
-    libgl1-mesa-glx libglib2.0-0 \
-    build-essential pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+    libgl1 \
+    libglib2.0-0 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
