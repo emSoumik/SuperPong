@@ -53,9 +53,10 @@ except ImportError:
 
 # Always import FastAPI for REST
 try:
-    from fastapi import FastAPI
+    from fastapi import FastAPI, responses
     from fastapi.middleware.cors import CORSMiddleware
     import uvicorn
+    FileResponse = responses.FileResponse
 except ImportError:
     print("ERROR: fastapi + uvicorn are required.  pip install fastapi uvicorn[standard]")
     sys.exit(1)
@@ -339,6 +340,14 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    favicon_path = pathlib.Path(__file__).parent / "favicon.ico"
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        if favicon_path.exists():
+            return FileResponse(favicon_path)
+        return responses.Response(status_code=404)
 
     # Health and capability check for the frontend
     @app.get("/health")

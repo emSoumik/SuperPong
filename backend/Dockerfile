@@ -19,14 +19,13 @@ WORKDIR /app
 RUN pip install --no-cache-dir uv
 
 # Copy lock + project metadata first for better Docker layer caching
-# Wildcards ensure this works whether Render uses the repo root OR the backend folder as context
-COPY *pyproject.toml *uv.lock backend* ./
+COPY pyproject.toml uv.lock ./
 
 # Install the exact locked runtime set (including Vision Agents extras)
 RUN uv sync --frozen --no-dev --extra full
 
-# Copy backend source (wildcard handles both root context and inner context)
-COPY backend* ./
+# Copy backend source
+COPY . .
 
 # Use the uv-managed virtual environment at runtime
 ENV PATH="/app/.venv/bin:$PATH"
