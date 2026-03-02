@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml uv.lock ./
 
 # Install the exact locked runtime set (including Vision Agents extras)
-RUN uv sync --frozen --no-dev --extra full
+RUN uv sync --no-dev --extra full
 
 # Copy backend source
 COPY . .
