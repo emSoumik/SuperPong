@@ -53,9 +53,10 @@ except ImportError:
 
 # Always import FastAPI for REST
 try:
-    from fastapi import FastAPI, responses
+    from fastapi import FastAPI, responses, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
     import uvicorn
+        import websockets
     FileResponse = responses.FileResponse
 except ImportError:
     print("ERROR: fastapi + uvicorn are required.  pip install fastapi uvicorn[standard]")
@@ -454,15 +455,67 @@ def create_app() -> FastAPI:
         asyncio.create_task(_push_state_to_agent(match_id))
         return {"ok": True}
 
-    return app
 
 
 # Server entry point
 
+    # Secure Gemini Live WebSocket proxy
+    @app.websocket("/ws/gemini")
+    async def gemini_proxy(websocket: WebSocket):
+        await websocket.accept()
+        
+        gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+        if not gemini_api_key:
+            await websocket.send_text(json.dumps({"error": "GEMINI_API_KEY not configured"}))
+            await websocket.close()
+            return
 
+        gemini_ws_url = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key={gemini_api_key}"
+
+        try:
+            async with websockets.connect(gemini_ws_url) as gemini_ws:
+
+                async def forward_to_gemini():
+                    try:
+                        while True:
+                            data = await websocket.receive_text()
+                            await gemini_ws.send(data)
+                    except (WebSocketDisconnect, Exception):
+                        await gemini_ws.close()
+
+                async def forward_to_client():
+                    try:
+                        async for message in gemini_ws:
+                            if isinstance(message, bytes):
+                                await websocket.send_bytes(message)
+                            else:
+                                await websocket.send_text(message)
+                    except (WebSocketDisconnect, Exception):
+                        pass
+
+                await asyncio.gather(
+                    forward_to_gemini(),
+                    forward_to_client(),
+                    return_exceptions=True
+                )
+        except Exception as e:
+            try:
+                await websocket.send_text(json.dumps({"error": str(e)}))
+            except Exception:
+                pass
+        finally:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+
+
+    return app
 def main():
     """Run the agent server."""
     app = create_app()
+    return app
+
 
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
