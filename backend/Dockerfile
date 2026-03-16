@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libgl1 \
     libglib2.0-0 \
+    libgthread-2.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -21,8 +22,8 @@ RUN pip install --no-cache-dir uv
 # Copy lock + project metadata first for better Docker layer caching
 COPY pyproject.toml uv.lock ./
 
-# Install the exact locked runtime set (including Vision Agents extras)
-RUN uv sync --frozen --no-dev --extra full
+# Install the runtime set (including Vision Agents extras)
+RUN uv sync --no-dev --extra full
 
 # Copy backend source
 COPY . .
